@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Miss K English</title>
+<style>
+  body { margin:0; font-family:system-ui,Arial; background:#0f172a; color:#e5e7eb; }
+  header { background:#1e293b; padding:10px 16px; display:flex; justify-content:space-between; align-items:center; }
+  h1 { font-size:16px; margin:0; }
+  .btn { padding:6px 12px; border:1px solid #334155; border-radius:6px; background:#1e293b; color:#e5e7eb; cursor:pointer; }
+  .btn.primary { background:#3b82f6; border-color:#2563eb; color:#fff; }
+  .grid { display:grid; gap:12px; margin:16px; }
+  @media(min-width:800px){ .grid { grid-template-columns:1fr 1fr; } }
+  textarea { width:100%; height:220px; border-radius:6px; border:1px solid #334155; background:#0f172a; color:#e5e7eb; padding:8px; resize:vertical; }
+  .row { display:flex; gap:8px; margin-top:6px; flex-wrap:wrap; }
+  #status { white-space:pre-wrap; margin:16px; font-size:14px; padding:8px; border:1px dashed #475569; border-radius:6px; background:#1e293b; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Miss K English v4</h1>
+ 
+</header>
+
+<div class="grid">
+  <div>
+    <label>中文</label>
+    <textarea id="inputZh"></textarea>
+    <div class="row">
+      <button id="btnZhEn" class="btn primary">中文 ➜ 英文</button>
+      <button id="btnClearZh" class="btn">清空</button>
+    </div>
+  </div>
+
+  <div>
+    <label>English</label>
+    <textarea id="outputEn"></textarea>
+    <div class="row">
+      <button id="btnEnZh" class="btn primary">英文 ➜ 中文(繁體)</button>
+      <button id="btnCheck" class="btn">Grammar</button>
+      <button id="btnClearEn" class="btn">清空</button>
+    </div>
+  </div>
+</div>
+
+<div id="status">✨ 直接輸入中文或英文即可。</div>
+
+<script>
+(function(){
+  const ui = {
+    inputZh: document.getElementById('inputZh'),
+    outputEn: document.getElementById('outputEn'),
+    zh2en: document.getElementById('btnZhEn'),
+    en2zh: document.getElementById('btnEnZh'),
+    check: document.getElementById('btnCheck'),
+    clearZh: document.getElementById('btnClearZh'),
+    clearEn: document.getElementById('btnClearEn'),
+    status: document.getElementById('status'),
+    save: document.getElementById('btnSave'),
+    diag: document.getElementById('btnDiag')
+  };
+
+  function setStatus(msg){ ui.status.textContent = msg; }
+
+  async function libreTranslate(text, target){
+    try{
+      const res = await fetch("https://libretranslate.de/translate", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ q:text, source:"auto", target:target, format:"text" })
+      });
+      if(!res.ok) throw new Error("HTTP "+res.status);
+      const data = await res.json();
+      return data.translatedText;
+    }catch(e){ throw new Error("LibreTranslate 錯誤: "+e.message); }
+  }
+
+  async function myMemory(text, source, target){
+    const url=`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${source}|${target}`;
+    const r=await fetch(url);
+    const j=await r.json();
+    return j?.responseData?.translatedText || "";
+  }
+
+  async function translateSmart(text, dir){
+    try{
+      return await libreTranslate(text, dir==="zh-en"?"en":"zh-TW");
+    }catch(e){
+      setStatus("⚠️ 主服務失敗，改用後備 MyMemory。");
+      return await myMemory(text, dir==="zh-en"?"zh-CN":"en", dir==="zh-en"?"en":"zh-TW");
+    }
+  }
+
+  async function grammarCheck(text){
+    try{
+      const p=new URLSearchParams(); p.append("text",text); p.append("language","en-US");
+      const r=await fetch("https://api.languagetool.org/v2/check", {method:"POST", headers:{"Content-Type":"application/x-www-form-urlencoded"}, body:p});
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const j=await r.json();
+      if(!j.matches.length) return text;
+      let result=text, shift=0;
+      j.matches.sort((a,b)=>a.offset-b.offset).forEach(m=>{
+        if(m.replacements[0]){
+          const start=m.offset+shift;
+          const end=start+m.length;
+          const rep=m.replacements[0].value;
+          result=result.slice(0,start)+rep+result.slice(end);
+          shift+=rep.length-m.length;
+        }
+      });
+      return result;
+    }catch(e){
+      setStatus("⚠️ 文法檢查服務失敗，改用簡易改寫。");
+      return await myMemory(text,"en","en");
+    }
+  }
+
+  ui.zh2en.addEventListener('click', async()=>{
+    const txt=ui.inputZh.value.trim(); if(!txt) return;
+    setStatus("翻譯中（中→英）…");
+    ui.outputEn.value=await translateSmart(txt,"zh-en");
+    setStatus("✅ 完成：中文→英文");
+  });
+
+  ui.en2zh.addEventListener('click', async()=>{
+    const txt=ui.outputEn.value.trim(); if(!txt) return;
+    setStatus("翻譯中（英→繁體中文）…");
+    ui.outputEn.value=await translateSmart(txt,"en-zh");
+    setStatus("✅ 完成：英文→中文(繁體)");
+  });
+
+  ui.check.addEventListener('click', async()=>{
+    const txt=ui.outputEn.value.trim(); if(!txt) return;
+    setStatus("文法檢查中…");
+    ui.outputEn.value=await grammarCheck(txt);
+    setStatus("✅ 完成：文法檢查");
+  });
+
+  ui.clearZh.addEventListener('click',()=>ui.inputZh.value="");
+  ui.clearEn.addEventListener('click',()=>ui.outputEn.value="");
+  ui.save.addEventListener('click',()=>{
+    const blob=new Blob([document.documentElement.outerHTML],{type:"text/html;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download="translator-v4.html"; a.click();
+    URL.revokeObjectURL(url);
+  });
+  ui.diag.addEventListener('click', async()=>{
+    try{
+      const r=await fetch("https://libretranslate.de/");
+      setStatus("診斷：LibreTranslate "+(r.ok?"可用":"失敗")+" | HTTP "+r.status);
+    }catch(e){ setStatus("診斷：請求失敗，可能被網路擋。"); }
+  });
+
+})();
+</script>
+</body>
+</html>
