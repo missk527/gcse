@@ -110,7 +110,7 @@
       });
       return result;
     }catch(e){
-      setStatus("⚠️ 文法檢查服務失敗，改用簡易改寫。");
+      setStatus("⚠️ Grammar檢查服務失敗，改用簡易改寫。");
       return await myMemory(text,"en","en");
     }
   }
@@ -131,9 +131,9 @@
 
   ui.check.addEventListener('click', async()=>{
     const txt=ui.outputEn.value.trim(); if(!txt) return;
-    setStatus("文法檢查中…");
+    setStatus("Grammar檢查中…");
     ui.outputEn.value=await grammarCheck(txt);
-    setStatus("✅ 完成：文法檢查");
+    setStatus("✅ 完成：Grammar");
   });
 
   ui.clearZh.addEventListener('click',()=>ui.inputZh.value="");
@@ -148,10 +148,11 @@
     try{
       const r=await fetch("https://libretranslate.de/");
       setStatus("診斷：LibreTranslate "+(r.ok?"可用":"失敗")+" | HTTP "+r.status);
-    }catch(e){ setStatus("診斷：請求失敗，可能被網路擋。"); }
+    }catch(e){ setStatus("診斷：請求失敗，可能被網路問題。"); }
   });
 
 })();
 </script>
 </body>
 </html>
+
