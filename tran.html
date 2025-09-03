@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Miss K English class</title>
+
+<style>
+:root{
+  --kids-bg:#EAF4FF;        /* 背景：淡藍 */
+  --kids-panel:#CDE5FF;     /* 頂部漸層起始 */
+  --kids-panel-2:#B3D8FF;   /* 頂部漸層結束 */
+  --kids-accent:#339CFF;    /* 主按鈕背景 */
+  --kids-accent-2:#007BFF;  /* 主按鈕邊框 */
+  --kids-text:#002C5F;      /* 主要文字 */
+  --kids-muted:#335577;     /* 標籤/次要文字 */
+  --kids-border:#99CFFF;    /* 邊框 */
+  --kids-shadow:0 6px 18px rgba(0,80,160,.18); /* 陰影 */
+  --kids-radius:12px;
+}
+body{ background:var(--kids-bg); color:var(--kids-text);
+  font-family:"Comic Sans MS","Noto Sans TC","Microsoft JhengHei",system-ui,Arial,sans-serif;
+  line-height:1.6; padding-bottom:110px; }
+header{ background:linear-gradient(180deg,var(--kids-panel),var(--kids-panel-2));
+  border-bottom:2px dashed var(--kids-border); box-shadow:var(--kids-shadow);
+  padding:14px 18px; display:flex; justify-content:space-between; align-items:center; }
+h1{ color:var(--kids-text); font-size:18px; margin:0; } h1::before{ content:"🦁"; margin-right:6px; }
+.btn{ padding:10px 14px; border:2px solid var(--kids-border); border-radius:20px;
+  background:#f8fbff; color:var(--kids-text); box-shadow:var(--kids-shadow); font-weight:700; cursor:pointer; }
+.btn.primary{ background:var(--kids-accent); border-color:var(--kids-accent-2); color:#fff; }
+textarea{ width:100%; height:220px; border-radius:14px; border:2px solid var(--kids-border);
+  background:#fafdff; color:var(--kids-text); font-size:15px; padding:10px; }
+#status{ border:2px dashed var(--kids-border); border-radius:var(--kids-radius);
+  background:#f0f8ff; color:var(--kids-text); box-shadow:var(--kids-shadow); padding:12px; margin:18px; }
+.grid{ display:grid; gap:14px; margin:18px; } @media (min-width:800px){ .grid{ grid-template-columns:1fr 1fr; } }
+.panel{ background:#f6fbff; border:2px solid var(--kids-border); border-radius:var(--kids-radius);
+  padding:14px; box-shadow:var(--kids-shadow); }
+label{ display:block; margin-bottom:8px; font-weight:900; color:var(--kids-muted); }
+
+/* 高亮差異 */
+.hl-del{ background:#ffe3e3; text-decoration:line-through; border-radius:6px; padding:0 4px; }
+.hl-ins{ background:#ddf8dd; border-bottom:2px solid #2d8a2d; border-radius:6px; padding:0 4px; }
+.small{ font-size:13px; color:#335577; }
+
+/* 修正細節卡片 */
+#review{ display:none; margin:18px; }
+#review .card{ background:#fafdff; border:2px solid var(--kids-border); border-radius:var(--kids-radius); padding:14px; box-shadow:var(--kids-shadow); }
+.suggest{ margin:8px 0 0 22px; } .suggest li{ margin:10px 0; }
+.chip-old{ background:#ffe3e3; border-radius:6px; padding:0 6px; }
+.chip-new{ background:#ddf8dd; border-radius:6px; padding:0 6px; border-bottom:2px solid #2d8a2d; }
+
+/* 右下貼紙 */
+body::after{
+  content:" 🐻🐰🦊 一起學English！ ";
+  position:fixed; right:10px; bottom:8px;
+  background:#fff; border:2px solid var(--kids-border); border-radius:14px;
+  padding:8px 10px; box-shadow:var(--kids-shadow);
+  font-weight:800; color:var(--kids-text); transform:scale(.9); pointer-events:none;
+}
+</style>
+
+</head>
+<body>
+<header><h1>Miss K English class</h1></header>
+
+<div class="grid">
+  <div class="panel">
+    <label>中文</label>
+    <textarea id="inputZh" placeholder="輸入中文"></textarea>
+    <div class="row" style="margin-top:8px; display:flex; gap:10px;">
+      <button id="btnZhEn" class="btn primary">中文 ➜ 英文</button>
+      <button id="btnClearZh" class="btn">清空</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <label>English</label>
+    <textarea id="outputEn" placeholder="輸入要翻譯／檢查的英文，或由左邊翻譯而來"></textarea>
+    <div class="row" style="margin-top:8px; display:flex; gap:10px;">
+      <button id="btnEnZh" class="btn primary">英文 ➜ 中文</button>
+      <button id="btnCheck" class="btn">Grammar</button>
+      <button id="btnClearEn" class="btn">清空</button>
+    </div>
+  </div>
+</div>
+
+<div id="status">✨ 可先「中文➜英文」，再按「Grammar」做智慧修正；或直接在 English 區輸入英文再修正。</div>
+
+<div id="review">
+  <div class="card">
+    <strong>🛠 修正細節</strong>
+    <p class="small">下方顯示「原句（紅色刪除）」與「修正文（綠色新增）」。</p>
+    <div><strong>原句：</strong> <span id="origHL"></span></div>
+    <div><strong>修正文：</strong> <span id="corrHL"></span></div>
+    <hr style="border:none;border-top:1px dashed #e6c55b;margin:12px 0;">
+    <div><strong>📝 建議清單</strong><ol id="suggestList" class="suggest"></ol></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  /* =================== 基本 UI =================== */
+  const ui = {
+    inputZh: document.getElementById('inputZh'),
+    outputEn: document.getElementById('outputEn'),
+    zh2en: document.getElementById('btnZhEn'),
+    en2zh: document.getElementById('btnEnZh'),
+    check: document.getElementById('btnCheck'),
+    clearZh: document.getElementById('btnClearZh'),
+    clearEn: document.getElementById('btnClearEn'),
+    status: document.getElementById('status'),
+    review: document.getElementById('review'),
+    origHL: document.getElementById('origHL'),
+    corrHL: document.getElementById('corrHL'),
+    suggestList: document.getElementById('suggestList')
+  };
+  function setStatus(t){ ui.status.textContent=t; }
+  const esc = t => t.replace(/[&<>"']/g, c => ({'&':"&amp;",'<':"&lt;",'>':"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+  function diffHL(oldText, newText){
+    if(oldText===newText) return {origHL:esc(oldText), corrHL:esc(newText)};
+    let s=0,e1=oldText.length-1,e2=newText.length-1;
+    while(s<=e1&&s<=e2&&oldText[s]===newText[s]) s++;
+    while(e1>=s&&e2>=s&&oldText[e1]===newText[e2]){e1--;e2--;}
+    return {
+      origHL: esc(oldText.slice(0,s))+'<span class="hl-del">'+esc(oldText.slice(s,e1+1))+'</span>'+esc(oldText.slice(e1+1)),
+      corrHL: esc(newText.slice(0,s))+'<span class="hl-ins">'+esc(newText.slice(s,e2+1))+'</span>'+esc(newText.slice(e2+1))
+    };
+  }
+  function renderSuggestions(changes){
+    ui.suggestList.innerHTML="";
+    changes.forEach(ch=>{
+      const li=document.createElement('li');
+      li.innerHTML = `<strong>${esc(ch.title)}</strong>： ${esc(ch.msg||"")}<br>
+        <span class="chip-old">${esc(ch.from||"")}</span> → <span class="chip-new">${esc(ch.to||"")}</span>`;
+      ui.suggestList.appendChild(li);
+    });
+  }
+
+  /* =================== 翻譯（多來源後備） =================== */
+  const LT_NODES = [
+    "https://libretranslate.de",
+    "https://translate.argosopentech.com",
+    "https://translate.mentality.rip"
+  ];
+  async function fetchWithTimeout(url, options={}, timeoutMs=9000){
+    const ctrl = new AbortController(); const t=setTimeout(()=>ctrl.abort(), timeoutMs);
+    try{ const r=await fetch(url,{...options,signal:ctrl.signal}); clearTimeout(t); return r; }
+    catch(e){ clearTimeout(t); throw e; }
+  }
+  async function translateViaMyMemory(text, dir){
+    const source=(dir==="zh-en")?"zh-CN":"en";
+    const target=(dir==="zh-en")?"en":"zh-TW";
+    const r=await fetchWithTimeout(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${source}|${target}`,{},9000);
+    if(!r.ok) throw new Error("MM "+r.status);
+    const j=await r.json(); return j?.responseData?.translatedText||"";
+  }
+  async function translateViaLibre(base, text, dir){
+    const target=(dir==="zh-en")?"en":"zh-TW";
+    const r=await fetchWithTimeout(`${base}/translate`,{
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ q:text, source:"auto", target, format:"text" })
+    },9000);
+    if(!r.ok) throw new Error("LT "+r.status);
+    const j=await r.json(); return j?.translatedText||"";
+  }
+  async function translateSmart(text, dir){
+    if(!text||!text.trim()) return "";
+    try{ const mm=await translateViaMyMemory(text,dir); if(mm && mm.trim()) return mm; }catch(_){}
+    for(const n of LT_NODES){
+      try{ const x=await translateViaLibre(n,text,dir); if(x && x.trim()) return x; }catch(_){}
+    }
+    setStatus("⚠️ 翻譯服務暫時不通，已顯示原文。"); return text;
+  }
+
+  /* =================== Grammar：LT + 本地規則 =================== */
+
+  /* 不規則動詞 */
+  const IRR = {"am":["was","been"],"is":["was","been"],"are":["were","been"],
+    "do":["did","done"],"does":["did","done"],"go":["went","gone"],
+    "come":["came","come"],"eat":["ate","eaten"],"see":["saw","seen"],
+    "take":["took","taken"],"make":["made","made"],"have":["had","had"],"has":["had","had"],
+    "get":["got","gotten"],"give":["gave","given"],"write":["wrote","written"],
+    "read":["read","read"],"run":["ran","run"],"sleep":["slept","slept"],
+    "feel":["felt","felt"],"leave":["left","left"],"meet":["met","met"],
+    "pay":["paid","paid"],"put":["put","put"],"say":["said","said"],
+    "buy":["bought","bought"],"bring":["brought","brought"],"think":["thought","thought"],
+    "teach":["taught","taught"],"begin":["began","begun"],"become":["became","become"],
+    "find":["found","found"],"hold":["held","held"],"keep":["kept","kept"],
+    "speak":["spoke","spoken"],"drink":["drank","drunk"],"drive":["drove","driven"],
+    "forget":["forgot","forgotten"],"forgive":["forgave","forgiven"],"grow":["grew","grown"],
+    "know":["knew","known"],"lose":["lost","lost"],"send":["sent","sent"],
+    "sit":["sat","sat"],"stand":["stood","stood"],"understand":["understood","understood"],
+    "win":["won","won"],"cut":["cut","cut"],"hit":["hit","hit"],"hurt":["hurt","hurt"],"let":["let","let"],"set":["set","set"],"cost":["cost","cost"]
+  };
+  const SPELL={
+    "becuase":"because","recieve":"receive","seperate":"separate","definately":"definitely",
+    "wierd":"weird","adress":"address","enviroment":"environment","tomatos":"tomatoes",
+    "alot":"a lot","occured":"occurred","wich":"which","thier":"their","beleive":"believe",
+    "freind":"friend","studing":"studying","untill":"until","sory":"sorry","consder":"consider",
+    "mum":"mom"
+  };
+  const SINGULARIZE={"boys":"boy","girls":"girl","students":"student","teachers":"teacher","friends":"friend","children":"child"};
+  function toPast(v){ if(IRR[v]) return IRR[v][0]; if(/[^aeiou]y$/.test(v)) return v.slice(0,-1)+"ied"; if(v.endsWith("e")) return v+"d"; return v+"ed"; }
+  function matchCase(t,s){ if(!s) return t; if(s===s.toUpperCase())return t.toUpperCase(); if(s[0]===s[0].toUpperCase())return t[0].toUpperCase()+t.slice(1); return t; }
+
+  async function applyLanguageToolOnceDetailed(input){
+    try{
+      const p=new URLSearchParams();
+      p.append("text", input);
+      p.append("language","en-US");
+      p.append("enabledCategories","GRAMMAR,CONFUSED_WORDS,TYPOGRAPHY,PUNCTUATION,STYLE");
+      const r=await fetch("https://api.languagetool.org/v2/check",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:p});
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const j=await r.json();
+      const ms=(j.matches||[]).filter(m=>m.replacements&&m.replacements[0]).sort((a,b)=>b.offset-a.offset);
+      let out=input, changes=[];
+      for(const m of ms){
+        const from=out.slice(m.offset, m.offset+m.length);
+        const to=m.replacements[0].value;
+        out=out.slice(0,m.offset)+to+out.slice(m.offset+m.length);
+        changes.push({ title:"LanguageTool", from, to, msg:m.message||"" });
+      }
+      return { text:out, count:changes.length, changes };
+    }catch(e){ return { text:input, count:0, changes:[] }; }
+  }
+
+  function localFixOnce(src){
+    let s=src, count=0; const changes=[];
+    const add=(title,from,to,msg="")=>{ if(from!==to){ count++; changes.push({title,from,to,msg}); } };
+
+    /* 句首大寫 + 拼字 */
+    s = s.replace(/(^|\.\s+|\?\s+|!\s+)([a-z])/g,(m,pre,ch)=>{ add("Capitalization",ch,ch.toUpperCase()); return pre+ch.toUpperCase(); });
+    s = s.replace(/\b([A-Za-z']+)\b/g,(m,w)=>{const low=w.toLowerCase();if(SPELL[low]){const to=matchCase(SPELL[low],w);add("Spelling",w,to);return to;}return w;});
+
+    /* have/has 一致 */
+    s = s.replace(/\bI\s+has\b/gi,()=>{ add("Have/has","I has","I have"); return "I have"; });
+    s = s.replace(/\b(you|we|they)\s+has\b/gi,(m,p)=>{ const to=p+" have"; add("Have/has",m,to); return to; });
+    s = s.replace(/\b(he|she|it)\s+have\b/gi,(m,p)=>{ const to=p+" has"; add("Have/has",m,to); return to; });
+
+    /* 表語單複數 */
+    s = s.replace(/\bI\s+am\s+(boys|girls|students|teachers|friends|children)\b/gi,(m,pl)=>{ const to=`I'm a ${SINGULARIZE[pl.toLowerCase()]||"person"}`; add("Predicate number",m,to); return to; });
+    s = s.replace(/\b(He|She|It)\s+is\s+(boys|girls|students|teachers|friends|children)\b/g,(m,subj,pl)=>{ const to=`${subj==='It'?"It's":(subj==='He'?"He's":"She's")} a ${SINGULARIZE[pl.toLowerCase()]||"person"}`; add("Predicate number",m,to); return to; });
+
+    /* 義務 have/has to */
+    s = s.replace(/\b(have|has)\s+go\b/gi,(m,aux)=>{ const to=`${aux} to go`; add("Obligation",m,to); return to; });
+
+    /* go shopping / go to school/home */
+    s = s.replace(/\bgo\s+to\s+shopping\b/gi,()=>{ const to="go shopping"; add("Collocation","go to shopping",to); return to; });
+    s = s.replace(/\b(go|went|gone)\s+(school|work|class|church|library|park|store|market|hospital|office|airport|station|zoo|museum|cinema|theater|beach|farm)\b/gi,
+      (m,v,place)=>{ const to=`${v} to ${place}`; add("Preposition",m,to); return to; });
+    s = s.replace(/\b(go|went|gone)\s+to\s+home\b/gi,(m,v)=>{ const to=`${v} home`; add("Preposition",m,to); return to; });
+
+    /* 完成式：常見錯誤 V3 & V2→V3 */
+    const BAD={"goed":"gone","goned":"gone","went":"gone","ate":"eaten","saw":"seen","did":"done","writed":"written","speaked":"spoken","buyed":"bought","taked":"taken","getted":"gotten","goted":"gotten"};
+    s = s.replace(/\b(have|has)\s+([a-z]+)\b/gi,(m,aux,v)=>{
+      const low=v.toLowerCase();
+      if(BAD[low]){ const to=`${aux} ${BAD[low]}`; add("Present perfect",m,to); return to; }
+      for(const base in IRR){ const[v2,v3]=IRR[base]; if(low===v2){ const to=`${aux} ${v3||v2}`; add("Present perfect",m,to); return to; } }
+      return m;
+    });
+
+    /* 未來式：有時間標記但沒 will/going to */
+    const futureMark=/\b(tomorrow|next\s+(week|month|year|mon(day)?|tue(sday)?|wed(nesday)?|thu(rsday)?|fri(day)?|sat(urday)?|sun(day)?)|soon|in\s+\d+\s+(minutes?|hours?|days?|weeks?|months?|years?))\b/i;
+    if(futureMark.test(s) && !/\b(will|going to)\b/i.test(s)){
+      s = s.replace(/^(Tomorrow|Next\b[^,]*|In\s+\d+\s+\w+|Soon)\s+([a-z]+)/i,(m,lead,verb)=>{ const to=`${lead} I will ${verb}`; add("Future",m,to); return to; });
+      s = s.replace(/\b(I|he|she|it|we|they|you)\s+([a-z]+)\b/gi,(m,subj,verb)=>{
+        if(/^(am|is|are|was|were|been|be|will|have|has|had|do|does|did|can|may|might|should|would|must|go|going)$/i.test(verb)) return m;
+        const to=`${subj} will ${verb}`; add("Future",m,to); return to;
+      });
+    }
+
+    /* === Extra fixes (common misses) =================================== */
+
+/* 1) She is girls / He is students → She is a girl / He is a student */
+(function() {
+  const PL2SG = {
+    boys: "boy", girls: "girl", students: "student", teachers: "teacher",
+    friends: "friend", children: "child", people: "person", men: "man", women: "woman",
+    cats: "cat", dogs: "dog", apples: "apple", books: "book"
+  };
+  s = s.replace(/\b(He|She|It)\s+is\s+([a-z]+)\b/gi, (m, subj, np) => {
+    const low = np.toLowerCase();
+    const head = PL2SG[low] || (/(ses|xes|zes|ches|shes)$/.test(low) ? np : low.endsWith("s") ? low.slice(0,-1) : null);
+    if (!head) return m;
+    const art = /^[aeiou]/i.test(head) ? "an" : "a";
+    const rep = `${subj} is ${art} ${head}`;
+    add("Predicate number", m, rep, "Singular subject needs singular complement.");
+    return rep;
+  });
+})();
+
+/* 2) be 後缺冠詞：I am boy → I'm a boy ; He is engineer → an engineer */
+(function(){
+  s = s.replace(/\b(I|He|She|It)\s+(?:am|is)\s+([a-z]+)\b/gi, (m, subj, noun) => {
+    // 已有 a/an 或專有名詞/不可數就略過（簡化：有冠詞/限定詞就不補）
+    if (/^(a|an|the|this|that|my|your|his|her|its|our|their)$/i.test(noun)) return m;
+    if (/^[A-Z]/.test(noun)) return m;
+    const art = /^[aeiou]/i.test(noun) ? "an" : "a";
+    const rep = `${subj} ${subj.toLowerCase()==="i"?"am":"is"} ${art} ${noun}`;
+    add("Article after be", m, rep, "Add a/an before a singular countable noun.");
+    return rep;
+  });
+})();
+
+/* 3) 數量詞 + 名詞複數：two apple → two apples；one apples → one apple */
+(function(){
+  // N>1 + 單數 → 複數（簡化規則：加 s；常見不規則可擴充表）
+  const IRR_PL = { child:"children", person:"people", man:"men", woman:"women", tooth:"teeth", foot:"feet", mouse:"mice" };
+  s = s.replace(/\b(\d+|two|three|four|five|six|seven|eight|nine|ten|many|several|a lot of)\s+([a-z]+)\b/gi,
+    (m, qty, noun) => {
+      if (/s$|children|people|men|women|teeth|feet|mice/i.test(noun)) return m;
+      const low = noun.toLowerCase();
+      const pl = IRR_PL[low] || (/(s|x|z|ch|sh)$/i.test(low) ? low + "es" :
+                  /[^aeiou]y$/i.test(low) ? low.slice(0,-1) + "ies" : low + "s");
+      const rep = `${qty} ${pl}`;
+      add("Plural after quantifier", m, rep);
+      return rep;
+    }
+  );
+  // one + 複數 → 單數
+  s = s.replace(/\b(one|a)\s+([a-z]+)s\b/gi, (m, one, noun) => {
+    const rep = `${one} ${noun}`;
+    add("Singular after one/a", m, rep);
+    return rep;
+  });
+})();
+
+/* 4) 代名詞 I 大寫 & 受格：with I → with me；to I → to me；Me and Gigi → Gigi and I */
+(function(){
+  // 單獨小寫 i → I
+  s = s.replace(/\bi\b/g, (m) => { add("Capitalization","i","I"); return "I"; });
+  // 介系詞後用受格
+  s = s.replace(/\b(with|to|for|from|at|of|about)\s+I\b/gi, (m, prep) => {
+    const rep = `${prep} me`;
+    add("Pronoun case", m, rep, "Use object case after a preposition.");
+    return rep;
+  });
+  // 主語位置 me and Name → Name and I
+  s = s.replace(/\b(me)\s+and\s+([A-Z][a-z]+)\b/g, (m, me, name) => {
+    const rep = `${name} and I`;
+    add("Pronoun case", m, rep, "Use subject case in subject position and put the name first.");
+    return rep;
+  });
+})();
+
+/* 5) There is/are 一致 */
+(function(){
+  s = s.replace(/\bThere\s+is\s+(many|several|a lot of|[0-9]+)\b/gi, (m, qty) => {
+    const rep = `There are ${qty}`;
+    add("There is/are agreement", m, rep);
+    return rep;
+  });
+  s = s.replace(/\bThere\s+are\s+(a|an|one)\b/gi, (m, a1) => {
+    const rep = `There is ${a1}`;
+    add("There is/are agreement", m, rep);
+    return rep;
+  });
+})();
+
+/* 6) 句首未來時間 + 缺 will（更穩定）：Tomorrow go… → Tomorrow I will go… */
+(function(){
+  s = s.replace(
+    /^(Tomorrow|Next\s+\w+|In\s+\d+\s+\w+|Soon)\s+(?:(?:me\s+and\s+)?I\s+)?([a-z]+)\b/mi,
+    (m, lead, verb) => {
+      if (/^(will|am|is|are|go|going|can|may|might|should|would|must|have|has)$/i.test(verb)) return m;
+      const rep = `${lead} I will ${verb}`;
+      add("Future time + will", m, rep);
+      return rep;
+    }
+  );
+})();
+
+/* 7) 現在完成式標記（since/for/already/just/yet）卻用過去式 → 改 have/has + V3 */
+(function(){
+  const mark = /\b(already|just|yet|ever|never|since\b(?:\s+\d{4})?|for\s+\d+\s+(?:minute|hour|day|week|month|year)s?)\b/i;
+  if (mark.test(s)) {
+    s = s.replace(/\b(We|They|You|I)\s+([a-z]+)\b/gi, (m, subj, verb) => {
+      const v = verb.toLowerCase();
+      if (/^(have|has|am|is|are|was|were|did|do|does|will)$/i.test(v)) return m;
+      const v3 = IRR[v] ? (IRR[v][1] || IRR[v][0]) : toPart(v);
+      const rep = `${subj} have ${v3}`;
+      add("Present perfect marker", m, rep);
+      return rep;
+    });
+    s = s.replace(/\b(He|She|It)\s+([a-z]+)\b/gi, (m, subj, verb) => {
+      const v = verb.toLowerCase();
+      if (/^(have|has|am|is|are|was|were|did|do|does|will)$/i.test(v)) return m;
+      const v3 = IRR[v] ? (IRR[v][1] || IRR[v][0]) : toPart(v);
+      const rep = `${subj} has ${v3}`;
+      add("Present perfect marker", m, rep);
+      return rep;
+    });
+  }
+})();
+
+/* 8) a/an 再保險：a + vowel / an + consonant 修正 */
+(function(){
+  s = s.replace(/\ba\s+([aeiouAEIOU]\w+)/g, (m, w) => {
+    const rep = `an ${w}`;
+    add("a/an", m, rep);
+    return rep;
+  });
+  s = s.replace(/\ban\s+([^aeiouAEIOU\s]\w*)/g, (m, w) => {
+    const rep = `a ${w}`;
+    add("a/an", m, rep);
+    return rep;
+  });
+})();
+
+/* 9) 小補：時間/日期介系詞（on Monday / at night / in the morning） */
+(function(){
+  const PREP_FIXES = [
+    [/\bin (Mon|Monday)\b/gi, "on Monday"],
+    [/\bin (Tue|Tuesday)\b/gi, "on Tuesday"],
+    [/\bin (Wed|Wednesday)\b/gi, "on Wednesday"],
+    [/\bin (Thu|Thursday)\b/gi, "on Thursday"],
+    [/\bin (Fri|Friday)\b/gi, "on Friday"],
+    [/\bin (Sat|Saturday)\b/gi, "on Saturday"],
+    [/\bin (Sun|Sunday)\b/gi, "on Sunday"],
+    [/\bat morning\b/gi, "in the morning"],
+    [/\bat afternoon\b/gi, "in the afternoon"],
+    [/\bin night\b/gi, "at night"]
+  ];
+  PREP_FIXES.forEach(([re, to]) => {
+    s = s.replace(re, (m) => { add("Preposition (time)", m, to); return to; });
+  });
+})();
+    
+    /* === Past tense (強化版) ======================================= */
+/* 看見同一分句內的 past signal，就把主詞後第一個動詞變過去式 */
+(function () {
+  // past 時間訊號
+  const PAST_SIGNAL =
+    /\b(yesterday|last\s+(?:night|week|month|year|mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)|\d+\s+(?:minute|hour|day|week|month|year)s?\s+ago|ago|in\s+\d{4})\b/i;
+
+  const AUX = /^(am|is|are|was|were|been|be|have|has|had|do|does|did|will|can|could|may|might|must|should|would|go|going)$/i;
+
+  // 1) 代名詞主詞：I/you/we/they/he/she/it + 動詞 …… <signal>
+  s = s.replace(
+    /\b(I|you|we|they|he|she|it)\s+([a-z]+)\b(?=[^.!?]*\b(yesterday|last\s+(?:night|week|month|year|mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)|\d+\s+(?:minute|hour|day|week|month|year)s?\s+ago|ago|in\s+\d{4})\b)/gi,
+    (m, subj, verb) => {
+      const v = verb.toLowerCase();
+      if (AUX.test(v)) return m;
+      const to = IRR[v] ? IRR[v][0] : toPast(v);
+      if (to !== verb) {
+        add("Past tense", `${subj} ${verb}`, `${subj} ${to}`, "Past-time marker in the same clause.");
+        return `${subj} ${to}`;
+      }
+      return m;
+    }
+  );
+
+  // 2) 句首時間置前：Yesterday/Last …/In 2010/… ago, I/he/she … <verb>
+  s = s.replace(
+    /\b(Yesterday|Last\s+[A-Za-z]+|In\s+\d{4}|\d+\s+(?:minutes?|hours?|days?|weeks?|months?|years?)\s+ago)\b[,\s]+\b(I|you|we|they|he|she|it)\s+([a-z]+)\b/gi,
+    (m, lead, subj, verb) => {
+      const v = verb.toLowerCase();
+      if (AUX.test(v)) return m;
+      const to = IRR[v] ? IRR[v][0] : toPast(v);
+      const rep = `${lead} ${subj} ${to}`;
+      add("Past tense", m, rep, "Time expression fronted.");
+      return rep;
+    }
+  );
+
+  // 3) 專有名詞主詞：Tom/Anna … <verb> …… <signal>
+  s = s.replace(
+    /\b([A-Z][a-z]+)\s+([a-z]+)\b(?=[^.!?]*\b(yesterday|last\s+(?:night|week|month|year|mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)|\d+\s+(?:minute|hour|day|week|month|year)s?\s+ago|ago|in\s+\d{4})\b)/g,
+    (m, name, verb) => {
+      const v = verb.toLowerCase();
+      if (AUX.test(v)) return m;
+      const to = IRR[v] ? IRR[v][0] : toPast(v);
+      const rep = `${name} ${to}`;
+      add("Past tense (proper noun)", m, rep, "Past-time marker in the same clause.");
+      return rep;
+    }
+  );
+})();
+
+    /* 人名 and I */
+    s = s.replace(/\b(i)\s+and\s+([A-Z][a-z]+)\b/g,(m,i,name)=>{ const to=`${name} and I`; add("Style",m,to); return to; });
+
+    /* 縮寫 + 空白 */
+    s = s.replace(/\bI am\b/g,()=>{ add("Contraction","I am","I'm"); return "I'm"; });
+    const before=s; s=s.replace(/ {2,}/g,' ').replace(/\s+([,.!?;:])/g,'$1'); if(s!==before){ add("Punctuation","extra spaces","cleaned"); }
+
+    return { text:s, count, changes };
+  }
+
+  async function grammarPipeline(text){
+    const lt1=await applyLanguageToolOnceDetailed(text);
+    const local=localFixOnce(lt1.text);
+    const lt2=await applyLanguageToolOnceDetailed(local.text);
+    const finalText=lt2.text;
+    const total=(lt1.count||0)+(local.count||0)+(lt2.count||0);
+    const changes=[...(lt1.changes||[]),...(local.changes||[]),...(lt2.changes||[])];
+    return { text:finalText, total, ltCount:(lt1.count||0)+(lt2.count||0), localCount:(local.count||0), changes };
+  }
+
+  /* =================== 事件 =================== */
+  ui.zh2en.addEventListener('click', async ()=>{
+    const zh=ui.inputZh.value.trim(); if(!zh) return;
+    setStatus("翻譯中（中→英）…");
+    ui.outputEn.value = await translateSmart(zh,"zh-en");
+    setStatus("✅ 完成：中文→英文");
+  });
+
+  ui.en2zh.addEventListener('click', async ()=>{
+    const en=ui.outputEn.value.trim(); if(!en) return;
+    setStatus("翻譯中（英→中）…");
+    ui.outputEn.value = await translateSmart(en,"en-zh");
+    setStatus("✅ 完成：英文→中文（已覆寫在右側框）");
+  });
+
+  ui.check.addEventListener('click', async ()=>{
+    const before=ui.outputEn.value.trim(); if(!before) return;
+    setStatus("Grammar 檢查中（LanguageTool → 本地規則）…");
+    const res=await grammarPipeline(before);
+    ui.outputEn.value=res.text;
+    const d=diffHL(before,res.text);
+    if(res.text!==before){ ui.origHL.innerHTML=d.origHL; ui.corrHL.innerHTML=d.corrHL; ui.review.style.display="block"; }
+    else{ ui.review.style.display="none"; }
+    renderSuggestions(res.changes);
+    setStatus(`✅ 已完成智慧修正（修正 ${res.total} 處｜LT：${res.ltCount}，本地：${res.localCount}）`);
+  });
+
+  ui.clearZh.addEventListener('click',()=>ui.inputZh.value="");
+  ui.clearEn.addEventListener('click',()=>ui.outputEn.value="");
+})();
+</script>
+</body>
+</html>
