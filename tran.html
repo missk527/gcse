@@ -477,18 +477,18 @@ body::after{
 
   // 1) 代名詞主詞：I/you/we/they/he/she/it + 動詞 …… <signal>
   s = s.replace(
-    /\b(I|you|we|they|he|she|it)\s+([a-z]+)\b(?=[^.!?]*\b(yesterday|last\s+(?:night|week|month|year|mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)|\d+\s+(?:minute|hour|day|week|month|year)s?\s+ago|ago|in\s+\d{4})\b)/gi,
-    (m, subj, verb) => {
-      const v = verb.toLowerCase();
-      if (AUX.test(v)) return m;
-      const to = IRR[v] ? IRR[v][0] : toPast(v);
-      if (to !== verb) {
-        add("Past tense", `${subj} ${verb}`, `${subj} ${to}`, "Past-time marker in the same clause.");
-        return `${subj} ${to}`;
-      }
-      return m;
+  /\b(I|you|we|they|he|she|it)\s+([a-z]+)(\s+(and|but)\s+([a-z]+))*(?=[^.!?]*\b(yesterday|last\s+(?:night|week|month|year|\w+)|\d+\s+(?:minute|hour|day|week|month|year)s?\s+ago|ago|in\s+\d{4})\b)/gi,
+  (m, subj, verb, _g3, conj, nextVerb) => {
+    function toPastForm(v) {
+      const low = v.toLowerCase();
+      if (/^(am|is|are|was|were|been|be|have|has|had|do|does|did|will|can|could|may|might|must|should|would|go|going)$/i.test(low)) return v;
+      return IRR[low] ? IRR[low][0] : toPast(v);
     }
-  );
+    let result = `${subj} ${toPastForm(verb)}`;
+    if (nextVerb) result += ` ${conj} ${toPastForm(nextVerb)}`;
+    return result;
+  }
+);
 
   // 2) 句首時間置前：Yesterday/Last …/In 2010/… ago, I/he/she … <verb>
   s = s.replace(
