@@ -466,30 +466,76 @@ body::after{
   });
 })();
     
-    /* === Past tense (強化版) ======================================= */
-/* 看見同一分句內的 past signal，就把主詞後第一個動詞變過去式 */
+    <!-- Past tense 強化：AUX 不含 go/going；支援 and/but/or 多動詞 -->
+/* === Past tense (強化版) ======================================= */
 (function () {
   // past 時間訊號
   const PAST_SIGNAL =
     /\b(yesterday|last\s+(?:night|week|month|year|mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)|\d+\s+(?:minute|hour|day|week|month|year)s?\s+ago|ago|in\s+\d{4})\b/i;
 
-  const AUX = /^(am|is|are|was|were|been|be|have|has|had|do|does|did|will|can|could|may|might|must|should|would|go|going)$/i;
+  // 助動詞/情態動詞（注意：已移除 go/going 才能轉 went）
+  const AUX = /^(am|is|are|was|were|been|be|have|has|had|do|does|did|will|can|could|may|might|must|should|would)$/i;
 
-  // 1) 代名詞主詞：I/you/we/they/he/she/it + 動詞 …… <signal>
+  // 1) 代名詞主詞：I/you/we/they/he/she/it + 多動詞 …… <past signal>
   s = s.replace(
-  /\b(I|you|we|they|he|she|it)\s+([a-z]+)(\s+(and|but)\s+([a-z]+))*(?=[^.!?]*\b(yesterday|last\s+(?:night|week|month|year|\w+)|\d+\s+(?:minute|hour|day|week|month|year)s?\s+ago|ago|in\s+\d{4})\b)/gi,
-  (m, subj, verb, _g3, conj, nextVerb) => {
-    function toPastForm(v) {
-      const low = v.toLowerCase();
-      if (/^(am|is|are|was|were|been|be|have|has|had|do|does|did|will|can|could|may|might|must|should|would|go|going)$/i.test(low)) return v;
-      return IRR[low] ? IRR[low][0] : toPast(v);
+    /\b(I|you|we|they|he|she|it)\s+([a-z]+(?:\s+(?:and|but|or)\s+[a-z]+)*)\b(?=[^.!?]*\b(yesterday|last\s+(?:night|week|month|year|mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)|\d+\s+(?:minute|hour|day|week|month|year)s?\s+ago|ago|in\s+\d{4})\b)/gi,
+    (m, subj, verbSeq) => {
+      function toPastForm(v) {
+        const low = v.toLowerCase();
+        if (AUX.test(low)) return v;
+        return IRR[low] ? matchCase(IRR[low][0], v) : matchCase(toPast(low), v);
+      }
+      const parts = verbSeq.split(/(\s+(?:and|but|or)\s+)/i);
+      for (let i = 0; i < parts.length; i++) {
+        if (/^\s*(and|but|or)\s*$/i.test(parts[i])) continue;
+        parts[i] = parts[i].replace(/\b([a-z]+)\b/i, (mm, v) => toPastForm(v));
+      }
+      const rep = `${subj} ${parts.join('')}`;
+      add("Past tense (multi-verb)", `${subj} ${verbSeq}`, rep, "All main verbs set to past within the same clause.");
+      return rep;
     }
-    let result = `${subj} ${toPastForm(verb)}`;
-    if (nextVerb) result += ` ${conj} ${toPastForm(nextVerb)}`;
-    return result;
-  }
-);
+  );
 
+  // 2) 句首時間置前：Yesterday/Last …/In 2010/… ago, I/he/she … <多動詞>
+  s = s.replace(
+    /\b(Yesterday|Last\s+[A-Za-z]+|In\s+\d{4}|\d+\s+(?:minutes?|hours?|days?|weeks?|months?|years?)\s+ago)\b[,\s]+\b(I|you|we|they|he|she|it)\s+([a-z]+(?:\s+(?:and|but|or)\s+[a-z]+)*)\b/gi,
+    (m, lead, subj, verbSeq) => {
+      function toPastForm(v) {
+        const low = v.toLowerCase();
+        if (AUX.test(low)) return v;
+        return IRR[low] ? matchCase(IRR[low][0], v) : matchCase(toPast(low), v);
+      }
+      const parts = verbSeq.split(/(\s+(?:and|but|or)\s+)/i);
+      for (let i = 0; i < parts.length; i++) {
+        if (/^\s*(and|but|or)\s*$/i.test(parts[i])) continue;
+        parts[i] = parts[i].replace(/\b([a-z]+)\b/i, (mm, v) => toPastForm(v));
+      }
+      const rep = `${lead} ${subj} ${parts.join('')}`;
+      add("Past tense (fronted time + multi-verb)", m, rep, "Time expression fronted; all main verbs set to past.");
+      return rep;
+    }
+  );
+
+  // 3) 專有名詞主詞：Tom/Anna … <多動詞> …… <past signal>
+  s = s.replace(
+    /\b([A-Z][a-z]+)\s+([a-z]+(?:\s+(?:and|but|or)\s+[a-z]+)*)\b(?=[^.!?]*\b(yesterday|last\s+(?:night|week|month|year|mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)|\d+\s+(?:minute|hour|day|week|month|year)s?\s+ago|ago|in\s+\d{4})\b)/g,
+    (m, name, verbSeq) => {
+      function toPastForm(v) {
+        const low = v.toLowerCase();
+        if (AUX.test(low)) return v;
+        return IRR[low] ? matchCase(IRR[low][0], v) : matchCase(toPast(low), v);
+      }
+      const parts = verbSeq.split(/(\s+(?:and|but|or)\s+)/i);
+      for (let i = 0; i < parts.length; i++) {
+        if (/^\s*(and|but|or)\s*$/i.test(parts[i])) continue;
+        parts[i] = parts[i].replace(/\b([a-z]+)\b/i, (mm, v) => toPastForm(v));
+      }
+      const rep = `${name} ${parts.join('')}`;
+      add("Past tense (proper noun + multi-verb)", m, rep, "Past-time marker in the same clause.");
+      return rep;
+    }
+  );
+})();
   // 2) 句首時間置前：Yesterday/Last …/In 2010/… ago, I/he/she … <verb>
   s = s.replace(
     /\b(Yesterday|Last\s+[A-Za-z]+|In\s+\d{4}|\d+\s+(?:minutes?|hours?|days?|weeks?|months?|years?)\s+ago)\b[,\s]+\b(I|you|we|they|he|she|it)\s+([a-z]+)\b/gi,
