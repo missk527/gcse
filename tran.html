@@ -466,6 +466,69 @@ body::after{
   });
 })();
     
+ /* === Past tense (強化版・穩定) ======================================= */
+// Past tense 強化：AUX 不含 go/going；支援 and/but/or 多動詞
+(function () {
+  // 過去時間標記（在同一句內）
+  const PAST_SIGNAL =
+    /\b(yesterday|last\s+(?:night|week|month|year|mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)|\d+\s+(?:minute|hour|day|week|month|year)s?\s+ago|in\s+\d{4})\b/i;
+
+  // 助動詞／情態詞（有它們就不變形）
+  const AUX = /^(am|is|are|was|were|be|been|being|have|has|had|do|does|did|will|shall|can|could|may|might|must|should|would)$/i;
+
+  // 單一動詞轉 V2（保守略過 -ing、已是 -ed、to）
+  function toPastForm(v) {
+    const low = v.toLowerCase();
+    if (AUX.test(low)) return v;
+    if (/(?:ing|ed)$/.test(low)) return v;
+    if (low === 'to') return v;
+    return IRR[low] ? matchCase(IRR[low][0], v) : matchCase(toPast(low), v);
+  }
+
+  // 多動詞序列（and/but/or）逐段處理每段的第一個詞
+  function convertVerbSequence(seq) {
+    const parts = seq.split(/(\s+(?:and|but|or)\s+)/i);
+    for (let i = 0; i < parts.length; i++) {
+      if (/^\s*(?:and|but|or)\s*$/i.test(parts[i])) continue;
+      parts[i] = parts[i].replace(/\b([A-Za-z]+)\b/, (m, v) => toPastForm(v));
+    }
+    return parts.join('');
+  }
+
+  // 1 代名詞主詞：I/you/we/they/he/she/it + 多動詞 …… <past signal>
+  s = s.replace(
+    /\b(I|you|we|they|he|she|it)\s+([a-z]+(?:\s+(?:and|but|or)\s+[a-z]+)*)\b(?=[^.!?]*\b(yesterday|last\s+(?:night|week|month|year|mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)|\d+\s+(?:minute|hour|day|week|month|year)s?\s+ago|in\s+\d{4})\b)/gi,
+    (m, subj, verbSeq) => {
+      const before = `${subj} ${verbSeq}`;
+      const after = `${subj} ${convertVerbSequence(verbSeq)}`;
+      if (before !== after) add("Past tense (multi-verb)", before, after, "All main verbs set to past within the same clause.");
+      return after;
+    }
+  );
+
+  // 2 句首時間置前：Yesterday/Last …/In 2010/… ago, I/he/she … <多動詞>
+  s = s.replace(
+    /\b(Yesterday|Last\s+[A-Za-z]+|In\s+\d{4}|\d+\s+(?:minutes?|hours?|days?|weeks?|months?|years?)\s+ago)\b[,\s]+\b(I|you|we|they|he|she|it)\s+([a-z]+(?:\s+(?:and|but|or)\s+[a-z]+)*)\b/gi,
+    (m, lead, subj, verbSeq) => {
+      const before = `${lead} ${subj} ${verbSeq}`;
+      const after = `${lead} ${subj} ${convertVerbSequence(verbSeq)}`;
+      if (before !== after) add("Past tense (fronted time + multi-verb)", before, after, "Time expression fronted; all main verbs set to past.");
+      return after;
+    }
+  );
+
+  // 3 專有名詞主詞：Tom/Anna … <多動詞> …… <past signal>
+  s = s.replace(
+    /\b([A-Z][a-z]+)\s+([a-z]+(?:\s+(?:and|but|or)\s+[a-z]+)*)\b(?=[^.!?]*\b(yesterday|last\s+(?:night|week|month|year|mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)|\d+\s+(?:minute|hour|day|week|month|year)s?\s+ago|in\s+\d{4})\b)/g,
+    (m, name, verbSeq) => {
+      const before = `${name} ${verbSeq}`;
+      const after = `${name} ${convertVerbSequence(verbSeq)}`;
+      if (before !== after) add("Past tense (proper noun + multi-verb)", before, after, "Past-time marker in the same clause.");
+      return after;
+    }
+  );
+})();
+   
 
     /* 人名 and I */
     s = s.replace(/\b(i)\s+and\s+([A-Z][a-z]+)\b/g,(m,i,name)=>{ const to=`${name} and I`; add("Style",m,to); return to; });
