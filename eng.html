@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>English Essay Submission</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="description" content="Submit an English essay (up to 30000 characters) with student name." />
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <div class="max-w-3xl mx-auto p-6">
+    <header class="mb-8">
+      <h1 class="text-3xl font-bold tracking-tight">English Essay Submission</h1>
+      <p class="text-sm text-gray-600 mt-2">請填寫學生姓名與作文，點擊「發送」後會以您的郵件程式寄至 <span class="font-mono">missk05027@gmail.com</span>。</p>
+    </header>
+
+    <form id="essayForm" class="space-y-6">
+      <!-- Student Name -->
+      <div>
+        <label for="studentName" class="block text-sm font-medium mb-2">學生姓名 <span class="text-red-600">*</span></label>
+        <input
+          type="text"
+          id="studentName"
+          name="studentName"
+          required
+          placeholder="例如：王小明"
+          class="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+        />
+      </div>
+
+      <!-- Essay -->
+      <div>
+        <div class="flex items-baseline justify-between mb-2">
+          <label for="essay" class="block text-sm font-medium">Essay<span class="text-red-600">*</span></label>
+          <span id="charCount" class="text-xs text-gray-500">0</span>
+        </div>
+        <textarea
+          id="essay"
+          name="essay"
+          rows="14"
+          
+          required
+          placeholder="請在此撰寫英文作文……"
+          class="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono"
+        ></textarea>
+        <p class="mt-2 text-xs text-gray-500">提示：此處的「字」指的是<strong>字元數</strong>（含空白）。若您需要放寬限制，可直接編輯此檔案中的 <code>maxlength</code> 值。</p>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex flex-wrap items-center gap-3">
+        <button
+          type="submit"
+          id="sendBtn"
+          class="inline-flex items-center justify-center rounded-2xl bg-indigo-600 px-5 py-3 text-white font-semibold shadow hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled
+        >
+          發送
+        </button>
+
+        <button
+          type="button"
+          id="clearBtn"
+          class="inline-flex items-center justify-center rounded-2xl bg-gray-200 px-5 py-3 font-semibold shadow hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400"
+        >
+          清除
+        </button>
+      </div>
+    </form>
+
+    <footer class="mt-10 text-xs text-gray-500">
+      <p>注意：此頁面使用 <code>mailto:</code> 方式開啟您電腦/手機的預設郵件程式進行寄送。若郵件內容過長或您的裝置限制，可能需要複製內容後於郵件程式貼上再寄送。</p>
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      const nameInput = document.getElementById('studentName');
+      const essayInput = document.getElementById('essay');
+      const countEl = document.getElementById('charCount');
+      const form = document.getElementById('essayForm');
+      const sendBtn = document.getElementById('sendBtn');
+      const clearBtn = document.getElementById('clearBtn');
+
+      function updateState() {
+        const len = essayInput.value.length;
+        countEl.textContent = len;
+        sendBtn.disabled = !(nameInput.value.trim() && essayInput.value.trim());
+      }
+
+      nameInput.addEventListener('input', updateState);
+      essayInput.addEventListener('input', updateState);
+
+      clearBtn.addEventListener('click', function () {
+        if (confirm('確定要清除內容嗎？')) {
+          nameInput.value = '';
+          essayInput.value = '';
+          updateState();
+          nameInput.focus();
+        }
+      });
+
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const name = nameInput.value.trim();
+        const essay = essayInput.value.trim();
+
+        if (!name || !essay) return;
+
+        // 組合郵件
+        const subject = 'Essay Submission - ' + name;
+        const body = [
+          'Student Name: ' + name,
+          '',
+          'Essay:',
+          essay
+        ].join('\n');
+
+        // 使用 mailto 開啟預設郵件程式
+        const mailtoHref = 'mailto:missk05027@gmail.com' +
+          '?subject=' + encodeURIComponent(subject) +
+          '&body=' + encodeURIComponent(body);
+
+        // 在部分瀏覽器中，使用 window.location.href 更穩定
+        window.location.href = mailtoHref;
+      });
+
+      // 初始狀態
+      updateState();
+    })();
+  </script>
+</body>
+</html>
